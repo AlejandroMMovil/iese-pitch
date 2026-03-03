@@ -8,11 +8,19 @@ st.set_page_config(page_title="IESE - Liderazgo y Autoconciencia", layout="cente
 RESET_PASSWORD = st.secrets.get("reset_password", "iese2024")  # Cambia "iese2024" por tu contraseña
 TIEMPO_VOTACION = 15  # Tiempo en segundos desde el primer voto
 
-# Inicializar datos en memoria (se mantiene mientras la app esté activa)
-if 'votos' not in st.session_state:
-    st.session_state.votos = pd.DataFrame(columns=["Nick", "Delta"])
-if 'timer_inicio' not in st.session_state:
-    st.session_state.timer_inicio = None
+# Almacenamiento compartido entre TODOS los usuarios
+@st.cache_resource
+def get_shared_data():
+    return {
+        'votos': pd.DataFrame(columns=["Nick", "Delta"]),
+        'timer_inicio': None
+    }
+
+shared = get_shared_data()
+
+# Mantener también en session_state para tracking local
+if 'mi_voto' not in st.session_state:
+    st.session_state.mi_voto = None
 
 st.title("📊 Pulso de Autoconciencia EMBA")
 
@@ -24,8 +32,9 @@ with st.sidebar:
         password = st.text_input("Contraseña:", type="password", key="reset_pwd")
         if st.button("🗑️ Resetear"):
             if password == RESET_PASSWORD:
-                st.session_state.votos = pd.DataFrame(columns=["Nick", "Delta"])
-                st.session_state.timer_inicio = None
+                shared['votos'] = pd.DataFrame(columns=["Nick", "Delta"])
+                shared['timer_inicio'] = None
+                st.session_state.mi_voto = None
                 st.success("✅ Datos reseteados correctamente")
                 time.sleep(1)
                 st.rerun()
@@ -36,8 +45,8 @@ with st.sidebar:
 tiempo_restante = None
 votacion_cerrada = False
 
-if st.session_state.timer_inicio is not None:
-    tiempo_transcurrido = time.time() - st.session_state.timer_inicio
+if shared['timer_inicio'] is not None:
+    tiempo_transcurrido = time.time() - shared['timer_inicio']
     tiempo_restante = TIEMPO_VOTACION - tiempo_transcurrido
 
     if tiempo_restante > 0:
@@ -54,7 +63,7 @@ if st.session_state.timer_inicio is not None:
         st.rerun()
     else:
         st.markdown("### ⏱️ ¡Tiempo finalizado!")
-        st.warning("⚠️ La votación ha cerrado. Revisa los resultados abajo.")
+        st.warning("⚠️ La votación ha cerrada. Revisa los resultados abajo.")
         votacion_cerrada = True
 
         # Seguir refrescando por 5 segundos más para actualizar a todos los usuarios
@@ -78,8 +87,8 @@ if not votacion_cerrada:
 
         if st.button("🚀 Enviar y ver resultados del grupo"):
             # Verificar si el tiempo ya expiró (para usuarios que no han recargado)
-            if st.session_state.timer_inicio is not None:
-                tiempo_transcurrido = time.time() - st.session_state.timer_inicio
+            if shared['timer_inicio'] is not None:
+                tiempo_transcurrido = time.time() - shared['timer_inicio']
                 if tiempo_transcurrido > TIEMPO_VOTACION:
                     st.error("⏱️ ¡Tiempo finalizado! Ya no se pueden enviar más votos.")
                     st.info("Refresca la página para ver los resultados finales.")
@@ -90,12 +99,15 @@ if not votacion_cerrada:
             delta = q2 - q1
 
             # Iniciar timer si es el primer voto
-            if st.session_state.timer_inicio is None:
-                st.session_state.timer_inicio = time.time()
+            if shared['timer_inicio'] is None:
+                shared['timer_inicio'] = time.time()
 
-            # Agregar el voto a la lista en memoria
+            # Agregar el voto a la lista compartida
             nuevo_voto = pd.DataFrame({"Nick": [nick], "Delta": [delta]})
-            st.session_state.votos = pd.concat([st.session_state.votos, nuevo_voto], ignore_index=True)
+            shared['votos'] = pd.concat([shared['votos'], nuevo_voto], ignore_index=True)
+
+            # Guardar mi voto en session_state
+            st.session_state.mi_voto = delta
 
             # Animación según el resultado
             if delta > 0:
@@ -118,12 +130,35 @@ st.markdown("---")
 st.subheader("Así evoluciona nuestra clase:")
 
 # Mostrar ranking automáticamente (siempre visible)
-if not st.session_state.votos.empty:
-    st.markdown(f"**Total de votos:** {len(st.session_state.votos)}")
+if not shared['votos'].empty:
+    st.markdown(f"**Total de votos:** {len(shared['votos'])}")
 
     # Ordenar por el mayor cambio (Delta)
-    df_sorted = st.session_state.votos.sort_values(by="Delta", ascending=False)
-    st.table(df_sorted)
+    df_sorted = shared['votos'].sort_values(by="Delta", ascending=False).reset_index(drop=True)
+
+    # Si el usuario ya votó, mostrar contexto personalizado
+    if st.session_state.mi_voto is not None:
+        mi_delta = st.session_state.mi_voto
+
+        # Encontrar usuarios cercanos (5 por arriba, 5 por abajo)
+        df_superiores = df_sorted[df_sorted['Delta'] > mi_delta].tail(5)  # 5 mejores que yo
+        df_inferiores = df_sorted[df_sorted['Delta'] < mi_delta].head(5)  # 5 peores que yo
+        mi_fila = df_sorted[df_sorted['Delta'] == mi_delta]
+
+        # Combinar y ordenar
+        df_contexto = pd.concat([df_superiores, mi_fila, df_inferiores]).sort_values(by="Delta", ascending=False).reset_index(drop=True)
+
+        st.markdown("### 👥 Compañeros con resultados similares:")
+        st.table(df_contexto)
+
+        # Opción para ver todos
+        if st.button("📊 Ver ranking completo"):
+            st.markdown("### 📋 Ranking completo:")
+            st.table(df_sorted)
+    else:
+        # Si no ha votado, mostrar todos
+        st.table(df_sorted)
+
     st.info("💡 Recuerda, siempre hay alguien en un punto parecido al tuyo.")
 else:
     st.write("Aún no hay votos. ¡Sé el primero!")
