@@ -4,11 +4,29 @@ import time
 
 st.set_page_config(page_title="IESE - Liderazgo y Autoconciencia", layout="centered")
 
+# Contraseña para resetear (puedes cambiarla aquí o en Streamlit Secrets)
+RESET_PASSWORD = st.secrets.get("reset_password", "iese2024")  # Cambia "iese2024" por tu contraseña
+
 # Inicializar datos en memoria (se mantiene mientras la app esté activa)
 if 'votos' not in st.session_state:
     st.session_state.votos = pd.DataFrame(columns=["Nick", "Delta"])
 
 st.title("📊 Pulso de Autoconciencia EMBA")
+
+# Sidebar con opción de reset (solo para administrador)
+with st.sidebar:
+    st.markdown("### 🔧 Admin")
+    with st.expander("Resetear datos"):
+        st.warning("⚠️ Esto borrará todos los votos")
+        password = st.text_input("Contraseña:", type="password", key="reset_pwd")
+        if st.button("🗑️ Resetear"):
+            if password == RESET_PASSWORD:
+                st.session_state.votos = pd.DataFrame(columns=["Nick", "Delta"])
+                st.success("✅ Datos reseteados correctamente")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("❌ Contraseña incorrecta")
 
 nick = st.text_input("Introduce tu Nick:", placeholder="Ej. Pedro")
 
