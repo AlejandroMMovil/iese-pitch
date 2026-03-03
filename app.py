@@ -1,52 +1,55 @@
 import streamlit as st
 import pandas as pd
+from st_gsheets_connection import GSheetsConnection
 import time
 
-st.set_page_config(page_title="IESE - Self-Awareness Test", layout="centered")
+st.set_page_config(page_title="IESE - Liderazgo y Autoconciencia", layout="centered")
 
-# Estilo para fondo oscuro y letra llamativa
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; color: white; }
-    .stSlider { padding-top: 2rem; }
-    </style>
-    """, unsafe_allow_html=True)
+# URL de tu Google Sheet real
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1yYjRPYPnMcunv95syWDCo92beM9iXneX67JUOyMi5W4/edit?usp=sharing"
 
-if 'responses' not in st.session_state:
-    st.session_state.responses = pd.DataFrame(columns=['Nick', 'Delta'])
+# Establecer conexión
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-st.header("Análisis de Autoconciencia")
+st.title("📊 Pulso de Autoconciencia EMBA")
 
-nick = st.text_input("Introduce tu nombre o nick:", placeholder="Ej. Pedro")
+nick = st.text_input("Introduce tu Nick:", placeholder="Ej. Pedro")
 
 if nick:
-    st.write(f"### Hola {nick}, visualízate hace dos años, cuando entraste al EMBA:")
-    q1 = st.select_slider("¿Cómo valorarías tu energía y optimismo en ese momento?", options=range(1, 11), value=5, key="q1")
+    st.markdown(f"### Hola **{nick}**, hagamos memoria...")
+    q1 = st.select_slider("Energía y optimismo al iniciar el EMBA (1-10):", options=range(1, 11), value=5)
     
-    st.write("### ¿Y cómo te puntuarías HOY?")
-    q2 = st.select_slider("Puntuación actual:", options=range(1, 11), value=5, key="q2")
+    st.markdown("### ¿Y cómo te sientes HOY?")
+    q2 = st.select_slider("Puntuación actual (1-10):", options=range(1, 11), value=5)
 
-    if st.button("Enviar y Ver Resultados"):
+    if st.button("🚀 Enviar y ver resultados del grupo"):
         delta = q2 - q1
-        new_row = pd.DataFrame({'Nick': [nick], 'Delta': [delta]})
-        st.session_state.responses = pd.concat([st.session_state.responses, new_row]).drop_duplicates('Nick', keep='last')
         
-        # Mensaje temporal que desaparece
-        placeholder = st.empty()
-        signo = "+" if delta > 0 else ""
-        placeholder.success(f"¡Has registrado un cambio de {signo}{delta} puntos!")
-        time.sleep(3)
-        placeholder.empty()
-
-        # Mostrar Ranking Final
-        st.markdown("---")
-        st.subheader("Así están tus compañeros:")
-        df_display = st.session_state.responses.sort_values(by='Delta', ascending=False)
-        st.table(df_display)
+        # Leer datos actuales para no borrar lo anterior
+        df_actual = conn.read(spreadsheet=SHEET_URL, usecols=[0,1], ttl=0)
         
-        st.markdown("#### *Siempre hay gente en un punto parecido al tuyo*")
+        # Crear nueva fila y subirla
+        new_data = pd.DataFrame({"Nick": [nick], "Delta": [delta]})
+        df_final = pd.concat([df_actual, new_data], ignore_index=True)
+        
+        conn.update(spreadsheet=SHEET_URL, data=df_final)
+        
+        st.balloons() # Pequeña celebración visual
+        st.success(f"¡Hecho! Tu evolución es de {delta:+} puntos.")
+        time.sleep(2)
+        st.rerun()
 
-# Botón de reset para tus simulacros (en el menú lateral)
-if st.sidebar.button("Resetear Simulacro"):
-    st.session_state.responses = pd.DataFrame(columns=['Nick', 'Delta'])
-    st.rerun()
+# --- RANKING GLOBAL ---
+st.markdown("---")
+st.subheader("Así evoluciona nuestra clase:")
+
+# Botón manual para refrescar el ranking en directo durante el discurso
+if st.button("🔄 Actualizar Ranking"):
+    df_global = conn.read(spreadsheet=SHEET_URL, ttl=0)
+    if not df_global.empty:
+        # Ordenar por el mayor cambio (Delta)
+        df_sorted = df_global.sort_values(by="Delta", ascending=False)
+        st.table(df_sorted)
+        st.info("💡 Recuerda, siempre hay alguien en un punto parecido al tuyo.")
+    else:
+        st.write("Aún no hay votos. ¡Sé el primero!")
