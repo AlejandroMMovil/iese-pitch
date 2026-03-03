@@ -6,7 +6,7 @@ st.set_page_config(page_title="IESE - Liderazgo y Autoconciencia", layout="cente
 
 # Configuración
 RESET_PASSWORD = st.secrets.get("reset_password", "iese2024")  # Cambia "iese2024" por tu contraseña
-TIEMPO_VOTACION = 15  # Tiempo en segundos desde el primer voto
+TIEMPO_VOTACION = 20  # Tiempo en segundos desde el primer voto
 
 # Almacenamiento compartido entre TODOS los usuarios
 @st.cache_resource
@@ -36,7 +36,6 @@ with st.sidebar:
                 shared['timer_inicio'] = None
                 st.session_state.mi_voto = None
                 st.success("✅ Datos reseteados correctamente")
-                time.sleep(1)
                 st.rerun()
             else:
                 st.error("❌ Contraseña incorrecta")
@@ -58,18 +57,14 @@ if shared['timer_inicio'] is not None:
         progreso = 1 - (tiempo_restante / TIEMPO_VOTACION)
         st.progress(progreso)
 
-        # Auto-refresh cada 2 segundos mientras el timer está activo
-        time.sleep(2)
-        st.rerun()
+        # Auto-refresh SOLO si ya voté (para no bloquear a los demás)
+        if st.session_state.mi_voto is not None and tiempo_restante > 1:
+            time.sleep(1)
+            st.rerun()
     else:
         st.markdown("### ⏱️ ¡Tiempo finalizado!")
         st.warning("⚠️ La votación ha cerrada. Revisa los resultados abajo.")
         votacion_cerrada = True
-
-        # Seguir refrescando por 5 segundos más para actualizar a todos los usuarios
-        if tiempo_transcurrido < TIEMPO_VOTACION + 5:
-            time.sleep(1)
-            st.rerun()
 else:
     st.info("⏱️ El timer iniciará cuando llegue el primer voto")
 
@@ -92,7 +87,6 @@ if not votacion_cerrada:
                 if tiempo_transcurrido > TIEMPO_VOTACION:
                     st.error("⏱️ ¡Tiempo finalizado! Ya no se pueden enviar más votos.")
                     st.info("Refresca la página para ver los resultados finales.")
-                    time.sleep(2)
                     st.rerun()
                     st.stop()  # Detener ejecución aquí
 
@@ -119,7 +113,7 @@ if not votacion_cerrada:
             else:
                 st.info(f"Tu evolución es de {delta:+} puntos. Te mantienes estable.")
 
-            time.sleep(2)
+            # Rerun SIN sleep para no bloquear a otros usuarios
             st.rerun()
 else:
     st.markdown("### 📝 La votación ha finalizado")
