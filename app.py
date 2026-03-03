@@ -6,7 +6,7 @@ st.set_page_config(page_title="IESE - Liderazgo y Autoconciencia", layout="cente
 
 # Configuración
 RESET_PASSWORD = st.secrets.get("reset_password", "iese2024")  # Cambia "iese2024" por tu contraseña
-TIEMPO_VOTACION = 12  # Tiempo en segundos desde el primer voto
+TIEMPO_VOTACION = 15  # Tiempo en segundos desde el primer voto
 
 # Inicializar datos en memoria (se mantiene mientras la app esté activa)
 if 'votos' not in st.session_state:
@@ -56,6 +56,11 @@ if st.session_state.timer_inicio is not None:
         st.markdown("### ⏱️ ¡Tiempo finalizado!")
         st.warning("⚠️ La votación ha cerrado. Revisa los resultados abajo.")
         votacion_cerrada = True
+
+        # Seguir refrescando por 5 segundos más para actualizar a todos los usuarios
+        if tiempo_transcurrido < TIEMPO_VOTACION + 5:
+            time.sleep(1)
+            st.rerun()
 else:
     st.info("⏱️ El timer iniciará cuando llegue el primer voto")
 
@@ -72,6 +77,16 @@ if not votacion_cerrada:
         q2 = st.select_slider("Puntuación actual (1-10):", options=range(1, 11), value=5)
 
         if st.button("🚀 Enviar y ver resultados del grupo"):
+            # Verificar si el tiempo ya expiró (para usuarios que no han recargado)
+            if st.session_state.timer_inicio is not None:
+                tiempo_transcurrido = time.time() - st.session_state.timer_inicio
+                if tiempo_transcurrido > TIEMPO_VOTACION:
+                    st.error("⏱️ ¡Tiempo finalizado! Ya no se pueden enviar más votos.")
+                    st.info("Refresca la página para ver los resultados finales.")
+                    time.sleep(2)
+                    st.rerun()
+                    st.stop()  # Detener ejecución aquí
+
             delta = q2 - q1
 
             # Iniciar timer si es el primer voto
