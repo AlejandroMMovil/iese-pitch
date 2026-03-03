@@ -12,7 +12,7 @@ TIEMPO_VOTACION = 20  # Tiempo en segundos desde el primer voto
 @st.cache_resource
 def get_shared_data():
     return {
-        'votos': pd.DataFrame(columns=["Nick", "Delta"]),
+        'votos': pd.DataFrame(columns=["Nick", "Cambio"]),
         'timer_inicio': None
     }
 
@@ -22,7 +22,7 @@ shared = get_shared_data()
 if 'mi_voto' not in st.session_state:
     st.session_state.mi_voto = None
 
-st.title("📊 Pulso de Autoconciencia EMBA")
+st.title("Análisis de Autoconciencia")
 
 # Sidebar con opción de reset (solo para administrador)
 with st.sidebar:
@@ -32,7 +32,7 @@ with st.sidebar:
         password = st.text_input("Contraseña:", type="password", key="reset_pwd")
         if st.button("🗑️ Resetear"):
             if password == RESET_PASSWORD:
-                shared['votos'] = pd.DataFrame(columns=["Nick", "Delta"])
+                shared['votos'] = pd.DataFrame(columns=["Nick", "Cambio"])
                 shared['timer_inicio'] = None
                 st.session_state.mi_voto = None
                 st.success("✅ Datos reseteados correctamente")
@@ -97,7 +97,7 @@ if not votacion_cerrada:
                 shared['timer_inicio'] = time.time()
 
             # Agregar el voto a la lista compartida
-            nuevo_voto = pd.DataFrame({"Nick": [nick], "Delta": [delta]})
+            nuevo_voto = pd.DataFrame({"Nick": [nick], "Cambio": [delta]})
             shared['votos'] = pd.concat([shared['votos'], nuevo_voto], ignore_index=True)
 
             # Guardar mi voto en session_state
@@ -106,10 +106,10 @@ if not votacion_cerrada:
             # Animación según el resultado
             if delta > 0:
                 st.balloons()  # Celebración si mejoró
-                st.success(f"🎉 ¡Genial! Tu evolución es de {delta:+} puntos.")
+                st.success(f"¡Genial! Tu evolución es de {delta:+} puntos. ¡Y en un mes terminamos!")
             elif delta < 0:
                 st.snow()  # Nieve si empeoró
-                st.info(f"💙 Tu evolución es de {delta:+} puntos. Recuerda que todos tenemos altibajos.")
+                st.info(f"💙 Tu evolución es de {delta:+} puntos. Recuerda que todos tenemos altibajos y tienes a tus compañeros para lo que necesites.")
             else:
                 st.info(f"Tu evolución es de {delta:+} puntos. Te mantienes estable.")
 
@@ -127,20 +127,20 @@ st.subheader("Así evoluciona nuestra clase:")
 if not shared['votos'].empty:
     st.markdown(f"**Total de votos:** {len(shared['votos'])}")
 
-    # Ordenar por el mayor cambio (Delta)
-    df_sorted = shared['votos'].sort_values(by="Delta", ascending=False).reset_index(drop=True)
+    # Ordenar por el mayor cambio (Cambio)
+    df_sorted = shared['votos'].sort_values(by="Cambio", ascending=False).reset_index(drop=True)
 
     # Si el usuario ya votó, mostrar contexto personalizado
     if st.session_state.mi_voto is not None:
         mi_delta = st.session_state.mi_voto
 
         # Encontrar usuarios cercanos (5 por arriba, 5 por abajo)
-        df_superiores = df_sorted[df_sorted['Delta'] > mi_delta].tail(5)  # 5 mejores que yo
-        df_inferiores = df_sorted[df_sorted['Delta'] < mi_delta].head(5)  # 5 peores que yo
-        mi_fila = df_sorted[df_sorted['Delta'] == mi_delta]
+        df_superiores = df_sorted[df_sorted['Cambio'] > mi_delta].tail(5)  # 5 mejores que yo
+        df_inferiores = df_sorted[df_sorted['Cambio'] < mi_delta].head(5)  # 5 peores que yo
+        mi_fila = df_sorted[df_sorted['Cambio'] == mi_delta]
 
         # Combinar y ordenar
-        df_contexto = pd.concat([df_superiores, mi_fila, df_inferiores]).sort_values(by="Delta", ascending=False).reset_index(drop=True)
+        df_contexto = pd.concat([df_superiores, mi_fila, df_inferiores]).sort_values(by="Cambio", ascending=False).reset_index(drop=True)
 
         st.markdown("### 👥 Compañeros con resultados similares:")
         st.table(df_contexto)
