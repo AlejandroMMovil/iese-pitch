@@ -82,8 +82,16 @@ if not votacion_cerrada:
             nuevo_voto = pd.DataFrame({"Nick": [nick], "Delta": [delta]})
             st.session_state.votos = pd.concat([st.session_state.votos, nuevo_voto], ignore_index=True)
 
-            st.balloons() # Pequeña celebración visual
-            st.success(f"¡Hecho! Tu evolución es de {delta:+} puntos.")
+            # Animación según el resultado
+            if delta > 0:
+                st.balloons()  # Celebración si mejoró
+                st.success(f"🎉 ¡Genial! Tu evolución es de {delta:+} puntos.")
+            elif delta < 0:
+                st.snow()  # Nieve si empeoró
+                st.info(f"💙 Tu evolución es de {delta:+} puntos. Recuerda que todos tenemos altibajos.")
+            else:
+                st.info(f"Tu evolución es de {delta:+} puntos. Te mantienes estable.")
+
             time.sleep(2)
             st.rerun()
 else:
