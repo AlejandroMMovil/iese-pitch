@@ -12,7 +12,7 @@ TIEMPO_VOTACION = 20  # Tiempo en segundos desde el primer voto
 @st.cache_resource
 def get_shared_data():
     return {
-        'votos': pd.DataFrame(columns=["Nick", "Cambio"]),
+        'votos': pd.DataFrame(columns=["Nick", "% Consciente"]),
         'timer_inicio': None
     }
 
@@ -32,7 +32,7 @@ with st.sidebar:
         password = st.text_input("Contraseña:", type="password", key="reset_pwd")
         if st.button("🗑️ Resetear"):
             if password == RESET_PASSWORD:
-                shared['votos'] = pd.DataFrame(columns=["Nick", "Cambio"])
+                shared['votos'] = pd.DataFrame(columns=["Nick", "% Consciente"])
                 shared['timer_inicio'] = None
                 st.session_state.mi_voto = None
                 st.success("✅ Datos reseteados correctamente")
@@ -74,11 +74,17 @@ if not votacion_cerrada:
     nick = st.text_input("Introduce tu Nick:", placeholder="Ej. Pedro")
 
     if nick:
-        st.markdown(f"### Hola **{nick}**, hagamos memoria...")
-        q1 = st.select_slider("Energía y optimismo al iniciar el EMBA (1-10):", options=range(1, 11), value=5)
+        st.markdown(f"### Hola **{nick}**")
+        st.markdown("### ¿Qué porcentaje de tu día actúas en 'Piloto Automático-Inercia' (dejando que las cosas pasen) frente a una 'Elección Intencional-Consciente' (siendo dueño de tus decisiones)?")
 
-        st.markdown("### ¿Y cómo te sientes HOY?")
-        q2 = st.select_slider("Puntuación actual (1-10):", options=range(1, 11), value=5)
+        porcentaje_consciente = st.slider(
+            "% de tiempo en Elección Consciente:",
+            min_value=0,
+            max_value=100,
+            value=50,
+            step=1,
+            format="%d%%"
+        )
 
         if st.button("🚀 Enviar y ver resultados del grupo"):
             # Verificar si el tiempo ya expiró (para usuarios que no han recargado)
@@ -90,28 +96,26 @@ if not votacion_cerrada:
                     st.rerun()
                     st.stop()  # Detener ejecución aquí
 
-            delta = q2 - q1
-
             # Iniciar timer si es el primer voto
             if shared['timer_inicio'] is None:
                 shared['timer_inicio'] = time.time()
 
             # Agregar el voto a la lista compartida
-            nuevo_voto = pd.DataFrame({"Nick": [nick], "Cambio": [delta]})
+            nuevo_voto = pd.DataFrame({"Nick": [nick], "% Consciente": [porcentaje_consciente]})
             shared['votos'] = pd.concat([shared['votos'], nuevo_voto], ignore_index=True)
 
             # Guardar mi voto en session_state
-            st.session_state.mi_voto = delta
+            st.session_state.mi_voto = porcentaje_consciente
 
             # Animación según el resultado
-            if delta > 0:
-                st.balloons()  # Celebración si mejoró
-                st.success(f"¡Genial! Tu evolución es de {delta:+} puntos. ¡Y en un mes terminamos!")
-            elif delta < 0:
-                st.snow()  # Nieve si empeoró
-                st.info(f"💙 Tu evolución es de {delta:+} puntos. Recuerda que todos tenemos altibajos y tienes a tus compañeros para lo que necesites.")
+            if porcentaje_consciente >= 70:
+                st.balloons()  # Celebración si es muy consciente
+                st.success(f"¡Excelente! Actúas de forma consciente un {porcentaje_consciente}% del tiempo. ¡Sigue así!")
+            elif porcentaje_consciente <= 30:
+                st.snow()
+                st.info(f"💙 Actúas de forma consciente un {porcentaje_consciente}% del tiempo. Recuerda que la autoconciencia es el primer paso del cambio.")
             else:
-                st.info(f"Tu evolución es de {delta:+} puntos. Te mantienes estable.")
+                st.info(f"Actúas de forma consciente un {porcentaje_consciente}% del tiempo. Hay oportunidad de mejora.")
 
             # Rerun SIN sleep para no bloquear a otros usuarios
             st.rerun()
@@ -121,26 +125,26 @@ else:
 
 # --- RANKING GLOBAL ---
 st.markdown("---")
-st.subheader("Así evoluciona nuestra clase:")
+st.subheader("Nivel de consciencia de nuestra clase:")
 
 # Mostrar ranking automáticamente (siempre visible)
 if not shared['votos'].empty:
     st.markdown(f"**Total de votos:** {len(shared['votos'])}")
 
-    # Ordenar por el mayor cambio (Cambio)
-    df_sorted = shared['votos'].sort_values(by="Cambio", ascending=False).reset_index(drop=True)
+    # Ordenar por el mayor porcentaje consciente
+    df_sorted = shared['votos'].sort_values(by="% Consciente", ascending=False).reset_index(drop=True)
 
     # Si el usuario ya votó, mostrar contexto personalizado
     if st.session_state.mi_voto is not None:
-        mi_delta = st.session_state.mi_voto
+        mi_porcentaje = st.session_state.mi_voto
 
         # Encontrar usuarios cercanos (5 por arriba, 5 por abajo)
-        df_superiores = df_sorted[df_sorted['Cambio'] > mi_delta].tail(5)  # 5 mejores que yo
-        df_inferiores = df_sorted[df_sorted['Cambio'] < mi_delta].head(5)  # 5 peores que yo
-        mi_fila = df_sorted[df_sorted['Cambio'] == mi_delta]
+        df_superiores = df_sorted[df_sorted['% Consciente'] > mi_porcentaje].tail(5)  # 5 mejores que yo
+        df_inferiores = df_sorted[df_sorted['% Consciente'] < mi_porcentaje].head(5)  # 5 peores que yo
+        mi_fila = df_sorted[df_sorted['% Consciente'] == mi_porcentaje]
 
         # Combinar y ordenar
-        df_contexto = pd.concat([df_superiores, mi_fila, df_inferiores]).sort_values(by="Cambio", ascending=False).reset_index(drop=True)
+        df_contexto = pd.concat([df_superiores, mi_fila, df_inferiores]).sort_values(by="% Consciente", ascending=False).reset_index(drop=True)
 
         st.markdown("### 👥 Compañeros con resultados similares:")
         st.table(df_contexto)
